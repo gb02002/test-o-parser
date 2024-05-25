@@ -20,11 +20,14 @@ class Products(models.Model):
     """Products model"""
 
     products_id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     price = models.FloatField(validators=[MinValueValidator(0.0)])
     description = models.TextField(max_length=2500)
-    image_url = models.URLField()
+    image_url = models.URLField(blank=True)
     discount = models.CharField(max_length=50)
+
+    class Meta:
+        unique_together = (('name', 'price'),)
 
     def __str__(self):
         return self.name

@@ -1,4 +1,6 @@
-from selenium.common import WebDriverException
+import re
+
+from selenium.common import WebDriverException, NoSuchElementException
 
 from parser.settings import PARSING_PATH
 from selenium import webdriver
@@ -7,6 +9,8 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import undetected_chromedriver as uc
 import logging
+
+from parsing_app import db_population
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -40,6 +44,7 @@ def establish_connection(driver):
 def main_logic(products_counts=10):
     """Main script"""
     try:
+        print(products_counts)
         driver = setUp()
         establish_connection(driver=driver)
 
@@ -74,7 +79,6 @@ def scraping(driver, links: list) -> bool:
             driver.get(link)
             product_data = parse_info(driver)
             save_to_db(product_data)
-            print(f"Сохранили в бд")
         except Exception as e:
             print(f"Ошибка при обработке ссылки {link}: {e}")
             error_count += 1
@@ -86,25 +90,46 @@ def scraping(driver, links: list) -> bool:
     return success
 
 
-def parse_info(driver) -> dict:
+def parse_info(driver) -> dict | None:
     """Parses product_data and returns it"""
     WebDriverWait(driver, 10).until(
         EC.visibility_of_element_located((By.XPATH, '//*[@id="section-description"]/div[2]/div/div/div'))
     )
 
-    name = driver.find_element(By.XPATH,
-                               '//*[@id="layoutPage"]/div[1]/div[4]/div[3]/div[1]/div[1]/div[2]/div/div[1]/h1').text
-    price = driver.find_element(By.XPATH,
-                                '//*[@id="layoutPage"]/div[1]/div[4]/div[3]/div[2]/div[1]/div[2]/div/div['
-                                '1]/div/div/div[1]/div[2]/div/div[1]/span[2]').text
-    image_url = driver.find_element(By.XPATH,
-                                    '//*[@id="layoutPage"]/div[1]/div[4]/div[3]/div[1]/div[1]/div['
-                                    '1]/div/div/div/div/div/div[2]/div[1]/div/img').get_attribute(
-        'src')
-    discount = driver.find_element(By.XPATH,
-                                   '//*[@id="layoutPage"]/div[1]/div[4]/div[3]/div[2]/div[1]/div[2]/div/div['
-                                   '1]/div/div/div[1]/div[2]/div/div[1]/span[1]').text
-    description = driver.find_element(By.XPATH, '//*[@id="section-description"]/div[2]/div/div/div').text
+    try:
+        name = driver.find_element(By.XPATH,
+                                   '//*[@id="layoutPage"]/div[1]/div[4]/div[3]/div[1]/div[1]/div[2]/div/div[1]/h1').text
+        price = driver.find_element(By.XPATH,
+                                        '//*[@id="layoutPage"]/div[1]/div[4]/div[3]/div[2]/div[1]/div[2]/div/div['
+                                        '1]/div/div/div[1]/div[2]/div/div[1]/span[2]').text[:-2]
+        price = extract_discount_from_element(price)
+        image_url = ""
+        try:
+            image_url = driver.find_element(By.XPATH,
+                                            '//*[@id="layoutPage"]/div[1]/div[4]/div[3]/div[1]/div[1]/div['
+                                            '1]/div/div/div/div/div/div[2]/div[1]/div/img').get_attribute('src')
+        except NoSuchElementException:
+            try:
+                image_url = driver.find_element(By.XPATH,
+                                                '//*[@id="layoutPage"]/div[1]/div[4]/div[3]/div[1]/div[1]/div['
+                                                '1]/div/div/div/div/div/div[2]/div[1]/div/div[1]').get_attribute('src')
+            except NoSuchElementException:
+                try:
+                    image_url = driver.find_element(By.XPATH,
+                                                    '//*[@id="layoutPage"]/div[1]/div[4]/div[3]/div[1]/div[1]/div['
+                                                    '1]/div/div/div/div/div/div/div[1]/div').get_attribute('src')
+                except NoSuchElementException:
+                    pass
+        finally:
+            if not image_url:
+                image_url = ""
+
+        discount = driver.find_element(By.XPATH, '//*[@id="layoutPage"]/div[1]/div[4]/div[3]/div[2]/div[1]/div[2]/div/div[1]/div/div/div[1]/div[2]/div/div[1]/span[1]').text[:-2]
+        discount = extract_discount_from_element(discount)
+        description = driver.find_element(By.XPATH, '//*[@id="section-description"]/div[2]/div/div/div').text
+
+    except NoSuchElementException:
+        return None
 
     product_data = {
         "name": name,
@@ -117,5 +142,25 @@ def parse_info(driver) -> dict:
     return product_data
 
 
-def save_to_db(product_data):
-    pass
+def save_to_db(product_data: dict | None):
+    if product_data:
+        db_population.populate_db(product_data)
+
+
+def extract_discount_from_element(str):
+    # Очистка строки от пробелов и неразрывных пробелов
+    cleaned_str = str.replace('\u2009', '').replace('\u202F', '').replace(' ', '')
+
+    # Проверка, состоит ли очищенная строка только из цифр
+    if cleaned_str.isdigit():
+        return int(cleaned_str)
+
+    # Если строка не состоит только из цифр, ищем числовое значение перед символом '₽'
+    match = re.search(r'(\d[\d\s]*)\s*', cleaned_str)
+    if match:
+        # Удаляем все пробелы из числа
+        clean_str = match.group(1).replace('\u2009', '').replace('\u202F', '').replace(' ', '')
+        return int(clean_str)
+
+    return 0
+
