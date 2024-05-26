@@ -14,7 +14,7 @@ import mysql.connector
 # from parsing_app.models import TelegramUser
 
 BOT_TOKEN = os.getenv('BOT_TOKEN', '')
-CHAT_ID = os.getenv('CHAT_ID', 6033353340)
+CHAT_ID = os.getenv('CHAT_ID', )
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
