@@ -1,0 +1,95 @@
+services:
+  db:
+    image: mysql:latest
+    restart: "on-failure"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p${DATABASE_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  # Путь к файлу инициализации
+    env_file:
+      - ./.env
+    ports:
+      - "3306:3306"
+    networks:
+      - app-network
+
+  cache:
+    image: redis:7.2.4-alpine
+    restart: always
+    expose:
+      - '6379'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    env_file:
+      - ./.env
+    command: redis-server --loglevel warning
+    volumes:
+      - cache:/data
+
+  web:
+    build: 
+      context: ./parser/
+    stdin_open: true
+    tty: true  
+    command: ./entry.sh 
+    restart: "on-failure"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./orgchar/orgproj:/usr/src/web/
+      - ./media_data:/home/jay/Desktop/python/orgproj/media    
+    ports:
+      - 8000:8000
+    env_file:
+      - ./.env
+    networks:
+      - app-network
+
+  telegram:
+    build:
+      context: ./parser/management/management/
+    working_dir: /usr/src/app
+    volumes:
+      - ./parser/management/management:/usr/src/app
+    stdin_open: true
+    tty: true
+    command: python bot.py
+    restart: "on-failure"
+    env_file:
+      - ./.env
+    networks:
+      - app-network  
+
+  celery:
+    build: ./parser
+    command: celery -A parser worker -l INFO
+    volumes:
+      - .:/usr/src/orgproj/
+    environment:
+      - DEBUG=1
+      - DJANGO_ALLOWED_HOST=localhost,127.0.0.1
+      - CELERY_BROKER=redis://cache:6379/0
+      - CELERY_BACKEND=redis://cache:6379/0
+    env_file:
+      - ./.env
+    depends_on:
+      - cache
+      - db
+    networks:
+      - app-network
+
+networks:
+  app-network:
+
+volumes:
+  mysql_data:
+  cache:
+

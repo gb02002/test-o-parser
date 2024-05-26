@@ -1,3 +1,4 @@
 parser/parser/*
 .env
-/venv/
+/venv/*
+db.sqlite3
