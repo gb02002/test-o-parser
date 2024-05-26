@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from parsing_app.models import Products
+from parsing_app.models import Products, LastProducts
 
 
 def populate_db(product_data):
@@ -12,6 +12,11 @@ def populate_db(product_data):
             description=product_data["description"],
             image_url= product_data["image_url"],
             discount=discount_percentage
+        )
+
+        LastProducts.objects.create(
+            name=product_data["name"],
+            image_url= product_data["image_url"],
         )
 
     except ValidationError as e:

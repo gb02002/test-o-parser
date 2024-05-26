@@ -1,6 +1,6 @@
 import re
-
 from selenium.common import WebDriverException, NoSuchElementException
+from parsing_app import db_population
 
 from parser.settings import PARSING_PATH
 from selenium import webdriver
@@ -9,8 +9,6 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import undetected_chromedriver as uc
 import logging
-
-from parsing_app import db_population
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)

@@ -26,9 +26,6 @@ class Products(models.Model):
     image_url = models.URLField(blank=True)
     discount = models.CharField(max_length=50)
 
-    class Meta:
-        unique_together = (('name', 'price'),)
-
     def __str__(self):
         return self.name
 
@@ -38,6 +35,29 @@ class Products(models.Model):
     class Meta:
         verbose_name = 'Товар'
         verbose_name_plural = 'Товары'
+        unique_together = (('name', 'price'),)
 
     objects = Manager()
     all_list = ProductManager()
+
+
+class LastProducts(models.Model):
+    """Last parsing products model"""
+
+    products_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255, unique=True)
+    image_url = models.URLField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = 'Товар'
+        verbose_name_plural = 'Товары'
+
+    objects = Manager()
+
+
+class TelegramUser(models.Model):
+    telegram_id = models.PositiveIntegerField(blank=True, null=True, db_index=True, unique=True, verbose_name='ID_Telegram')
+    username = models.CharField(max_length=150, blank=True, verbose_name='Username')
